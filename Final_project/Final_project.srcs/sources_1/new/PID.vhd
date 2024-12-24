@@ -1,43 +1,85 @@
-----------------------------------------------------------------------------------
--- Company: 
--- Engineer: 
--- 
--- Create Date: 12/23/2024 08:10:02 PM
--- Design Name: 
--- Module Name: PID - Behavioral
--- Project Name: 
--- Target Devices: 
--- Tool Versions: 
--- Description: 
--- 
--- Dependencies: 
--- 
--- Revision:
--- Revision 0.01 - File Created
--- Additional Comments:
--- 
-----------------------------------------------------------------------------------
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.NUMERIC_STD.ALL;
 
+ENTITY PID IS
+	PORT (
+		CLK          : IN std_logic;
+		RESET        : IN std_logic;
+		SETPOINT     : IN signed(15 DOWNTO 0); -- Desired value
+		MEASUREMENT  : IN signed(15 DOWNTO 0); -- System feedback
+		KP           : IN signed(15 DOWNTO 0); -- Proportional gain
+		KI           : IN signed(15 DOWNTO 0); -- Integral gain
+		KD           : IN signed(15 DOWNTO 0); -- Derivative gain
+		OUTPUT       : OUT signed(15 DOWNTO 0)  -- Output signal
+	);
+END PID;
 
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
+ARCHITECTURE Behavioral OF PID IS
+	SIGNAL ERROR        : signed(15 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL PREV_ERROR   : signed(15 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL PROPORTIONAL : signed(31 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL INTEGRAL     : signed(31 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL DERIVATIVE   : signed(31 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL OUTPUT_TEMP  : signed(31 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL DT           : signed(15 DOWNTO 0) := to_signed(1, 16); -- Fixed time step
+BEGIN
+	ERROR_PROCESS : PROCESS (CLK, RESET)
+	BEGIN
+		IF RESET = '1' THEN
+			ERROR <= (OTHERS => '0');
+			PREV_ERROR <= (OTHERS => '0');
+		ELSIF rising_edge(CLK) THEN
+			PREV_ERROR <= ERROR;
+			ERROR <= SETPOINT - MEASUREMENT;
+		END IF;
+	END PROCESS;
 
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
---use IEEE.NUMERIC_STD.ALL;
+	PROPORTIONAL_PROCESS : PROCESS (CLK, RESET)
+	BEGIN
+		IF RESET = '1' THEN
+			PROPORTIONAL <= (OTHERS => '0');
+		ELSIF rising_edge(CLK) THEN
+			PROPORTIONAL <= ERROR * KP;
+		END IF;
+	END PROCESS;
 
--- Uncomment the following library declaration if instantiating
--- any Xilinx leaf cells in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
+	INTEGRAL_PROCESS : PROCESS (CLK, RESET)
+	BEGIN
+		IF RESET = '1' THEN
+			INTEGRAL <= (OTHERS => '0');
+		ELSIF rising_edge(CLK) THEN
+			INTEGRAL <= INTEGRAL + ERROR * KI * DT;
+		END IF;
+	END PROCESS;
 
-entity PID is
---  Port ( );
-end PID;
+	DERIVATIVE_PROCESS : PROCESS (CLK, RESET)
+	BEGIN
+		IF RESET = '1' THEN
+			DERIVATIVE <= (OTHERS => '0');
+		ELSIF rising_edge(CLK) THEN
+			IF DT /= 0 THEN
+				DERIVATIVE <= KD * (ERROR - PREV_ERROR) / DT;
+			ELSE
+				DERIVATIVE <= (OTHERS => '0');
+			END IF;
+		END IF;
+	END PROCESS;
 
-architecture Behavioral of PID is
+	OUTPUT_PROCESS : PROCESS (CLK, RESET)
+	BEGIN
+		IF RESET = '1' THEN
+			OUTPUT <= (OTHERS => '0');
+		ELSIF rising_edge(CLK) THEN
+			OUTPUT_TEMP <= PROPORTIONAL + INTEGRAL + DERIVATIVE;
+			IF OUTPUT_TEMP > to_signed(32767, 32) THEN
+				OUTPUT <= to_signed(32767, 16); -- Max limit
+			ELSIF OUTPUT_TEMP < to_signed(-32768, 32) THEN
+				OUTPUT <= to_signed(-32768, 16); -- Min limit
+			ELSE
+				OUTPUT <= resize(OUTPUT_TEMP, 16); -- Cast to 16 bits
+			END IF;
+		END IF;
+	END PROCESS;
 
-begin
-
-
-end Behavioral;
+END Behavioral;
