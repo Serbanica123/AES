@@ -5,7 +5,7 @@ use IEEE.MATH_REAL.ALL;
 
 entity Encoder is
   generic (
-      N_BIT : integer := 2
+      N_BIT : integer := 15
    );
     
   port (
