@@ -1,133 +1,119 @@
-library IEEE;
-use IEEE.std_logic_1164.all;
-use IEEE.numeric_std.all;
-use IEEE.MATH_REAL.ALL;
+--Add Libraries
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
-entity Encoder is
-  generic (
-      N_BIT : integer := 15
-   );
-    
-  port (
-      CLK          : in  std_logic;
-      RST          : in  std_logic;
-      A            : in  std_logic;
-      B	           : in  std_logic;
-      POSITION     : out std_logic_vector(N_BIT downto 0);
-      ENC_ERROR    : out std_logic
-  );
-end entity Encoder;
+--Define Entity
+entity ENCODER is
 
-architecture Behavioral of Encoder is   
-    -- Define the states
-    type State is (errState, S01, S00, S10, S11);
-    signal current_state : State;
+    generic (
+        N : integer := 16 -- Length of the POSITION signal
+    );
 
-    -- Define the position counter
-    signal position_counter : integer range -(2**N_BIT) to (2**N_BIT)-1; -- -2^15 to +2^15 - 1
-    signal AB: std_logic_vector(1 downto 0);
-    
+    port (
+        CLK         : in  std_logic;
+        RST         : in  std_logic;
+        A           : in  std_logic;
+        B           : in  std_logic;
+        ENC_ERROR   : out std_logic;
+        POSITION    : out std_logic_vector(N-1 downto 0)
+    );
+end ENCODER;
+
+--Define Architecture
+architecture behavioral of ENCODER is
+  
+  --Define StateMachine
+  type state_type is (s00, s01, s10, s11, errState);
+  
+  --Define Signals
+  signal state : state_type;
+  signal AB : std_logic_vector(1 downto 0);
+  signal position_internal : integer;
+ 
 begin
-    
-	 AB <= A & B;
-	 POSITION <= std_logic_vector(to_signed(position_counter, N_BIT+1));
-	 
-    -- Synchronous process for state transition
-    process(CLK, RST, AB)
-    begin
-        if rising_edge(CLK) then
-            if RST = '1' then
-            -- Ensures that everytime RST is on then ENC_ERROR & POSITION should be 0
-               ENC_ERROR <= '0'; 
-               
-               -- Reset Mode 
-               case(AB) is
-		  when "01" =>
-                      current_state <= S01;
-	 	  when "00" =>
-                      current_state <= S00;
-		  when "10" =>
-                      current_state <= S10;
-	          when "11" =>
-                      current_state <= S11;
-                  when others =>
-                      current_state <= errState;
-                      position_counter <= 0;
-                      ENC_ERROR <= '0';
-		        end case;
-            else
-               -- Normal Mode Operation
-                ENC_ERROR <= '0';
-		case (current_state) is
-		  when S01 =>
-                    if AB = "00" then
-                       current_state <= S00;
-                       position_counter <= position_counter;
-                    end if;
-						 
-	            if AB = "11" then
-                       current_state <= S11;
-                       position_counter <= position_counter;
-                    end if;
-						 
-                    if AB = "10" then 
-                       current_state <= errState;
-                    end if;
-						 
-	           when S00 =>
-                    if AB = "10" then
-                       current_state <= S10;
-                       position_counter <= position_counter;
-                    end if;
-						 
-	            if AB = "01" then
-                       current_state <= S01;
-                       position_counter <= position_counter;
-                    end if;
-						 
-                    if AB = "11" then
-                       current_state <= errState;
-                    end if;
-						 
-                  when S10 =>
-                    if AB = "11" then
-                       current_state <= S11;
-                       position_counter <= position_counter;
-                    end if;
-						 
-                    if AB = "00" then
-                       current_state <= S00;
-                       position_counter <= position_counter;
-                    end if;
-						 
-                    if AB = "01" then
-                       current_state <= errState;
-                    end if;
-					
-                  when S11 =>
-                    if AB = "01" then
-                       current_state <= S01;
-                       position_counter <= position_counter + 1;
-                    end if;
-                                 
-                    if AB = "10" then
-                       current_state <= S10;
-                       position_counter <= position_counter - 1;
-                    end if;
-                                 
-                    if AB = "00" then
-                       current_state <= errState;  
-                    end if;
-         
-		  when errState =>
-		     current_state <= errState;
-			 position_counter <= 0;
-			 ENC_ERROR <= '1';
-		  end case;
-			      
-		  end if;
-	    end if;
-	    
-    end process;
-    
-end architecture Behavioral;
+  
+  --Bundle A&B to AB
+  AB <= A & B;
+  
+  --Assign internal position to output
+  POSITION <= std_logic_vector(to_signed(position_internal, N));
+  
+  --Process Encoder (Based on StateMachine)
+  process(CLK, RST) is  
+  begin
+    if RST = '0' then
+        --Set Correct state
+        case AB is
+            when "00" => 
+                state <= s00;
+            when "01" =>
+                state <= s01;
+            when "10" =>
+                state <= s10;
+            when "11" =>
+                state <= s11;
+            when others => 
+                state <= errState;
+        end case;
+        --Reset Position to 0
+        position_internal <= 0;
+        ENC_ERROR <= '0';
+        
+        
+    elsif rising_edge(CLK) then 
+        case state is
+            when s00 => --Increment or lower the position
+                if (AB = "01")  then 
+                    position_internal <= position_internal + 1; 
+                    state <= s01;
+                elsif (AB = "10") then
+                    position_internal <= position_internal - 1; 
+                    state <= s10;
+                elsif (AB = "11") then
+                    state <= errState;
+                end if;
+                
+            when s01 =>--Increment or lower the position
+                if (AB = "11")  then 
+                    position_internal <= position_internal + 1; 
+                    state <= s11;
+                elsif (AB = "00") then
+                    position_internal <= position_internal - 1;
+                    state <= s00;
+                elsif (AB = "10") then
+                    state <= errState;
+                end if;
+                
+            when s10 =>--Increment or lower the position
+                if (AB = "00")  then 
+                    position_internal <= position_internal + 1; 
+                    state <= s00;
+                elsif (AB = "11") then
+                    position_internal <= position_internal - 1; 
+                    state <= s11;
+                elsif (AB = "01") then
+                    state <= errState;
+                end if;
+                
+            when s11 =>--Increment or lower the position
+                if (AB = "10")  then 
+                    position_internal <= position_internal + 1; 
+                    state <= s10;
+                elsif (AB = "01") then
+                    position_internal <= position_internal - 1; 
+                    state <= s01;
+                elsif (AB = "00") then
+                    state <= errState;
+                end if;
+                
+            when errState =>
+                ENC_ERROR <= '1';
+            when others => 
+                ENC_ERROR <= '1';
+                
+        end case;
+    end if;
+  end process;
+  
+end behavioral;
