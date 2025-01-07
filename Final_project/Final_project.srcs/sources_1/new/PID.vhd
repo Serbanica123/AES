@@ -3,6 +3,10 @@ USE IEEE.STD_LOGIC_1164.ALL;
 USE IEEE.NUMERIC_STD.ALL;
 
 ENTITY PID IS
+
+GENERIC(
+    MAX_OUTPUT: INTEGER := 25000
+);
 	PORT (
 		CLK          : IN std_logic;
 		RESET        : IN std_logic;
@@ -22,7 +26,7 @@ ARCHITECTURE Behavioral OF PID IS
 	SIGNAL INTEGRAL     : signed(31 DOWNTO 0) := (OTHERS => '0');
 	SIGNAL DERIVATIVE   : signed(31 DOWNTO 0) := (OTHERS => '0');
 	SIGNAL OUTPUT_TEMP  : signed(31 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL DT           : signed(15 DOWNTO 0) := to_signed(1, 16); -- Fixed time step
+	SIGNAL DT           : signed(15 DOWNTO 0) := to_signed(2, 16); -- Fixed time step
 BEGIN
 	ERROR_PROCESS : PROCESS (CLK, RESET)
 	BEGIN
@@ -49,7 +53,7 @@ BEGIN
 		IF RESET = '1' THEN
 			INTEGRAL <= (OTHERS => '0');
 		ELSIF rising_edge(CLK) THEN
-			INTEGRAL <= INTEGRAL + ERROR * KI * DT;
+			INTEGRAL <= resize(INTEGRAL + resize(ERROR * KI * DT, INTEGRAL'LENGTH), INTEGRAL'LENGTH);
 		END IF;
 	END PROCESS;
 
@@ -71,11 +75,11 @@ BEGIN
 		IF RESET = '1' THEN
 			OUTPUT <= (OTHERS => '0');
 		ELSIF rising_edge(CLK) THEN
-			OUTPUT_TEMP <= PROPORTIONAL + INTEGRAL + DERIVATIVE;
-			IF OUTPUT_TEMP > to_signed(32767, 32) THEN
-				OUTPUT <= to_signed(32767, 16); -- Max limit
-			ELSIF OUTPUT_TEMP < to_signed(-32768, 32) THEN
-				OUTPUT <= to_signed(-32768, 16); -- Min limit
+			OUTPUT_TEMP <= PROPORTIONAL+DERIVATIVE+INTEGRAL;
+			IF OUTPUT_TEMP > to_signed(MAX_OUTPUT, 32) THEN
+				OUTPUT <= to_signed(MAX_OUTPUT, 16); -- Max limit
+			ELSIF OUTPUT_TEMP < to_signed(-MAX_OUTPUT, 32) THEN
+				OUTPUT <= to_signed(-MAX_OUTPUT, 16); -- Min limit
 			ELSE
 				OUTPUT <= resize(OUTPUT_TEMP, 16); -- Cast to 16 bits
 			END IF;
