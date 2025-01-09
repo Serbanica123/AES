@@ -16,7 +16,7 @@ entity PWM is
         PWM_DIR      : out std_logic;
         PWM_ERROR    : out std_logic
     );
-end PWM_Generator;
+end PWM;
 
 architecture Behavioral of PWM is
     signal Counter : unsigned(N_BIT-1 downto 0);
