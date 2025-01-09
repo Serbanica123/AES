@@ -1,0 +1,48 @@
+#include "xbasic_types.h"
+#include "xparameters.h"
+#include "sleep.h"
+#include "xtime_l.h"
+
+// Define the parameters
+#define Kp 5.0
+#define sleeptime_ms 1000
+
+int main() {
+
+	// Save addresses from the FPGA Setup
+	Xuint32 *BASEADDR_ENC = XPAR_GPIO_ENCODER_BASEADDR;
+	Xuint32 *BASEADDR_PWR = XPAR_GPIO_PWM_BASEADDR;
+
+	int16_t currentPosition;
+	int8_t controllerOutput;
+
+    while (1) {
+        // Read the current value from GPIO
+        currentPosition = *(BASEADDR_ENC);
+        xil_printf("Current position: %d \n\r", currentPosition);
+
+        // Calculate the PID output
+        if (currentPosition >= 0){
+        	controllerOutput = Kp * currentPosition;
+        	if(controllerOutput > (int8_t)127){
+        		controllerOutput = (int8_t)127;
+        	}
+        }
+        else{
+        	controllerOutput = Kp * currentPosition;
+        	if (controllerOutput < (int8_t)-128){
+        		controllerOutput = (int8_t)-128;
+        	}
+        }
+
+        xil_printf("Output power value: %d \n\r", controllerOutput);
+
+        // Write the power level to the output
+        *(BASEADDR_PWR) = controllerOutput;
+
+        // Sleep for requested time
+        usleep(sleeptime_ms * 1000); // Sleep for sleeptime_ms milliseconds
+    }
+
+    return 0;
+}

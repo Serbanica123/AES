@@ -1,0 +1,49 @@
+#include <stdio.h>
+#include <stdint.h>
+#include "xbasic_types.h"
+#include "xparameters.h"
+#include "sleep.h"
+#include "xtime_l.h"
+
+// Define constants
+#define SLEEPTIME_MS 1000 // Sleep time in milliseconds
+#define MAX_VALUE 25000   // Maximum clock cycles for the PWM
+#define MIN_VALUE 12500 // Minimum clock cycles for the PWM
+#define Kp 5
+
+// Save addresses from the FPGA Setup
+Xuint32 *BASEADDR_ENC = XPAR_ENCODER_OUTPUT_BASEADDR;
+Xuint32 *BASEADDR_PWR = XPAR_POWER_BASEADDR;
+
+uint16_t currentPosition;
+
+int main() {
+    while (1) {
+        // Read the current position from the encoder
+        currentPosition = *(BASEADDR_ENC);
+
+        // Display the current position
+        xil_printf("Current Position value: %u \n\r", currentPosition);
+
+        if (currentPosition <= MAX_VALUE) {
+            // Check if the power value is positive or negative
+            if (currentPosition > 0) {
+                xil_printf("PWM_Dir is off\n\r");
+            } else {
+                xil_printf("PWM_Dir is on\n\r");
+            }
+
+            // Write the Power value to the PWM Power register
+            *(BASEADDR_PWR) = currentPosition;
+            xil_printf("POWER Value written: %u cycles \n\r", currentPosition);
+
+        } else if (currentPosition > MAX_VALUE) {
+            xil_printf("POWER is already at max value! \n\r");
+        }
+
+        // Sleep for the specified interval
+        usleep(SLEEPTIME_MS * 1000); // Convert milliseconds to microseconds
+    }
+
+    return 0;
+}

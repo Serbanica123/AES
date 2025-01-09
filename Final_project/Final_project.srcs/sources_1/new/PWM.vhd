@@ -26,17 +26,17 @@ begin
     begin
         if rising_edge(CLK) then
            if RST = '1' then
-                -- Reset the counter
-                Counter <= (others => '0'); 
+              -- Reset the counter
+               Counter <= (others => '0');  
            else    
-               -- Reset the counter to zero if the counter reaches its max value
-               if to_integer(unsigned(Counter)) >= MAX_VALUE then
+              -- Reset the counter to zero if the counter reaches its max value
+              if to_integer(unsigned(Counter)) >= MAX_VALUE then
                   -- Reset the counter
-                   Counter <= (others => '0'); 
-               else
-                   -- Increment the counter by 1 if RST is off and counter is not at max value
-                    Counter <= Counter + 1;
-               end if;   
+                  Counter <= (others => '0'); 
+              else
+                  -- Increment the counter by 1 if RST is off and counter is not at max value
+                  Counter <= Counter + 1;
+              end if; 
            end if;
         end if;
     end process;
