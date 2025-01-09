@@ -1,68 +1,57 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
+use IEEE.numeric_std.all;
+use IEEE.MATH_REAL.ALL;
 
 entity PWM is
-    Generic (
-        N : integer := 8 -- Length of the POWER signal
+    generic (
+        MAX_VALUE  : integer := 25000; --Specs: 100us and 200us so the range clock cycles can vary from 12500 to 25000 period
+        N_BIT      : integer := 15 --N-Bits required to describe the max value in power
     );
-    Port (
-        CLK : in STD_LOGIC;
-        RST : in STD_LOGIC;
-        POWER : in STD_LOGIC_VECTOR(N-1 downto 0);
-        PWM_OUT : out STD_LOGIC;
-        PWM_ERROR : out STD_LOGIC;
-        PWM_DIR : out STD_LOGIC
+    Port ( 
+        RST          : in std_logic;
+        CLK          : in std_logic;
+        POWER        : in std_logic_vector(N_BIT downto 0); --The counter ranges from 12500 to 25000, so you need max 15 bits bcs 2^15 = 32768;
+        PWM_OUT      : out std_logic;
+        PWM_DIR      : out std_logic;
+        PWM_ERROR    : out std_logic
     );
-end PWM;
+end PWM_Generator;
 
 architecture Behavioral of PWM is
-    signal counter : integer := 0;
-    constant MAX_VALUE : integer := 2**(N-1) - 1; -- Calculate MAX_VALUE based on N
-    constant MAX_POWER : integer := 25000; -- Calculate MAX_VALUE based on N
-    signal power_int : integer;
+    signal Counter : unsigned(N_BIT-1 downto 0);
 begin
 
-    process(CLK, RST) begin
-        -- Reset Case
-        if RST = '0' then
-            counter <= 0;
-            PWM_OUT <= '0';
-            PWM_ERROR <= '0';
-            PWM_DIR <= 'Z';
-            
-        elsif rising_edge(CLK) then
-            -- Convert POWER to integer every clock cycle
-            power_int <= to_integer(abs(signed(POWER)));
-            
-             -- POWER does not exceed MAX_VALUE --> Continue going
-            if ( ( (power_int <=  MAX_POWER) AND (power_int >= -MAX_POWER) ) OR (RST = '1') ) then
-                PWM_ERROR <= '0';
-
-                -- Every Clock cycle increase counter until it's at MAX_VALUE, in which case it resets
-                if counter >= MAX_VALUE then
-                    counter <= 0;
-                else
-                    counter <= counter + 1;
-                end if;
-                
-                -- If the counter is lower than POWER go HIGH, otherwise go LOW
-                if counter <= power_int then
-                    PWM_OUT <= '1';
-                else 
-                    PWM_OUT <= '0';
-                end if;
-                
-                -- The MSB of POWER determines the direction.
-                PWM_DIR <= POWER(N-1);
-            
-            --Power exceeds MAX_VALUE --> Give error
-            else 
-                PWM_ERROR <= '1';
-                PWM_OUT <= '0';
-                PWM_DIR <= 'Z';
-            end if;
-            
+    RisingEdge : process(CLK, RST)
+    begin
+        if rising_edge(CLK) then
+           if RST = '1' then
+              -- Reset the counter
+               Counter <= (others => '0');  
+           else    
+              -- Reset the counter to zero if the counter reaches its max value
+              if to_integer(unsigned(Counter)) >= MAX_VALUE then
+                  -- Reset the counter
+                  Counter <= (others => '0'); 
+              else
+                  -- Increment the counter by 1 if RST is off and counter is not at max value
+                  Counter <= Counter + 1;
+              end if; 
+           end if;
         end if;
     end process;
+    
+    --PWM output is active ('1') when RST if off and the counter is less than the absolute value of POWER
+    --PWM_OUT   <= '1' when (RST = '0' and to_integer(unsigned(Counter)) < to_integer(abs(signed(POWER)))) else '0'; 
+    PWM_OUT <= '0' when RST = '1' else
+    '1' when to_integer(unsigned(Counter)) < abs(signed(POWER)) else
+    '0';
+    
+    -- When RST is active, PWM_DIR is set to high-impedance ('Z')
+    -- When POWER is negative, PWM_DIR is '1'
+    PWM_DIR   <= POWER(N_BIT) when RST = '0' else 'Z'; 
+   
+    -- When it is outside range, the power error activates
+    PWM_ERROR <= '1' when (to_integer(abs(signed(POWER))) > MAX_VALUE) and RST = '0' else '0'; 
+
 end Behavioral;
