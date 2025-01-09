@@ -10,34 +10,23 @@ GENERIC(
 	PORT (
 		CLK          : IN std_logic;
 		RESET        : IN std_logic;
-		SETPOINT     : IN signed(15 DOWNTO 0); -- Desired value
-		MEASUREMENT  : IN signed(15 DOWNTO 0); -- System feedback
-		KP           : IN signed(15 DOWNTO 0); -- Proportional gain
-		KI           : IN signed(15 DOWNTO 0); -- Integral gain
-		KD           : IN signed(15 DOWNTO 0); -- Derivative gain
+		ERROR  : IN signed(7 DOWNTO 0); -- System feedback
+		KP           : IN signed(7 DOWNTO 0); -- Proportional gain
+		KI           : IN signed(7 DOWNTO 0); -- Integral gain
+		KD           : IN signed(7 DOWNTO 0); -- Derivative gain
 		OUTPUT       : OUT signed(15 DOWNTO 0)  -- Output signal
 	);
 END PID;
 
 ARCHITECTURE Behavioral OF PID IS
-	SIGNAL ERROR        : signed(15 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL PREV_ERROR   : signed(15 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL PROPORTIONAL : signed(31 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL INTEGRAL     : signed(31 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL DERIVATIVE   : signed(31 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL OUTPUT_TEMP  : signed(31 DOWNTO 0) := (OTHERS => '0');
-	SIGNAL DT           : signed(15 DOWNTO 0) := to_signed(2, 16); -- Fixed time step
+	SIGNAL PREV_ERROR   : signed(7 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL PROPORTIONAL : signed(15 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL INTEGRAL     : signed(15 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL DERIVATIVE   : signed(15 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL OUTPUT_TEMP  : signed(15 DOWNTO 0) := (OTHERS => '0');
+	SIGNAL DT           : signed(7 DOWNTO 0) := to_signed(2, 8); -- Fixed time step
+	SIGNAL KD_DT :signed(7 DOWNTO 0) := KD/DT;
 BEGIN
-	ERROR_PROCESS : PROCESS (CLK, RESET)
-	BEGIN
-		IF RESET = '1' THEN
-			ERROR <= (OTHERS => '0');
-			PREV_ERROR <= (OTHERS => '0');
-		ELSIF rising_edge(CLK) THEN
-			PREV_ERROR <= ERROR;
-			ERROR <= SETPOINT - MEASUREMENT;
-		END IF;
-	END PROCESS;
 
 	PROPORTIONAL_PROCESS : PROCESS (CLK, RESET)
 	BEGIN
@@ -61,11 +50,13 @@ BEGIN
 	BEGIN
 		IF RESET = '1' THEN
 			DERIVATIVE <= (OTHERS => '0');
+			PREV_ERROR <= (OTHERS => '0');
 		ELSIF rising_edge(CLK) THEN
 			IF DT /= 0 THEN
-				DERIVATIVE <= KD * (ERROR - PREV_ERROR) / DT;
+				DERIVATIVE <= KD_DT * (ERROR - PREV_ERROR);
 			ELSE
 				DERIVATIVE <= (OTHERS => '0');
+				PREV_ERROR <= ERROR;
 			END IF;
 		END IF;
 	END PROCESS;
@@ -76,12 +67,12 @@ BEGIN
 			OUTPUT <= (OTHERS => '0');
 		ELSIF rising_edge(CLK) THEN
 			OUTPUT_TEMP <= PROPORTIONAL+DERIVATIVE+INTEGRAL;
-			IF OUTPUT_TEMP > to_signed(MAX_OUTPUT, 32) THEN
+			IF OUTPUT_TEMP > to_signed(MAX_OUTPUT, 16) THEN
 				OUTPUT <= to_signed(MAX_OUTPUT, 16); -- Max limit
-			ELSIF OUTPUT_TEMP < to_signed(-MAX_OUTPUT, 32) THEN
+			ELSIF OUTPUT_TEMP < to_signed(-MAX_OUTPUT, 16) THEN
 				OUTPUT <= to_signed(-MAX_OUTPUT, 16); -- Min limit
 			ELSE
-				OUTPUT <= resize(OUTPUT_TEMP, 16); -- Cast to 16 bits
+				OUTPUT <= OUTPUT_TEMP; 
 			END IF;
 		END IF;
 	END PROCESS;

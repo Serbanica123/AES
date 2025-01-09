@@ -3,7 +3,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.numeric_std.all;
 use IEEE.MATH_REAL.ALL;
 
-entity PWM_Generator is
+entity PWM is
     generic (
         MAX_VALUE  : integer := 25000; --Specs: 100us and 200us so the range clock cycles can vary from 12500 to 25000 period
         N_BIT      : integer := 15 --N-Bits required to describe the max value in power
@@ -16,9 +16,9 @@ entity PWM_Generator is
         PWM_DIR      : out std_logic;
         PWM_ERROR    : out std_logic
     );
-end PWM_Generator;
+end PWM;
 
-architecture Behavioral of PWM_Generator is
+architecture Behavioral of PWM is
     signal Counter : unsigned(N_BIT-1 downto 0);
 begin
 
