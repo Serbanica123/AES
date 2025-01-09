@@ -130,4 +130,8 @@ begin
 	    
     end process;
     
+<<<<<<< HEAD
 end architecture Behavioral;
+=======
+end architecture Behavioral;
+>>>>>>> 3745d49e2a60019cfb25eb18eb3d95bf52d5d505

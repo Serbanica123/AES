@@ -54,4 +54,8 @@ begin
     -- When it is outside range, the power error activates
     PWM_ERROR <= '1' when (to_integer(abs(signed(POWER))) > MAX_VALUE) and RST = '0' else '0'; 
 
+<<<<<<< HEAD
 end Behavioral;
+=======
+end Behavioral;
+>>>>>>> 3745d49e2a60019cfb25eb18eb3d95bf52d5d505
